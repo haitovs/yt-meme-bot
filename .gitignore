@@ -1,0 +1,19 @@
+# Bytecode / cache
+__pycache__/
+*.py[cod]
+
+# Editors
+.idea/
+.vscode/
+
+# Environment files
+.env
+
+# Runtime artifacts
+bot.log
+uploads.db
+tmp_*.mp4
+tmp_now_*.mp4
+
+# Secrets
+channels/*.json

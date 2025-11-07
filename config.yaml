@@ -1,0 +1,7 @@
+telegram_token: "8415747057:AAFaiNS7V6mE4lJuLyENZ7gIwI-FuFrNzYw"
+admin_id: 1221132388
+daily_limit: 10
+upload_start_hour: 13
+upload_interval_minutes: 15
+channels_path: "channels/"
+db_path: "uploads.db"
