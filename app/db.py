@@ -83,17 +83,19 @@ def log_new_job(
     con.close()
 
 
-def check_if_hash_exists(file_hash: str) -> Optional[dt.date]:
-    """Returns date of first upload if hash exists, else None."""
+def check_if_hash_exists(file_hash: str) -> Optional[Tuple[dt.date, str]]:
+    """Returns (date, title) of first upload if hash exists, else None."""
     if not file_hash:
         return None
     con = _conn()
-    cur = con.execute("SELECT scheduled_at FROM uploads WHERE file_hash = ? LIMIT 1", (file_hash,))
+    cur = con.execute("SELECT scheduled_at, title FROM uploads WHERE file_hash = ? LIMIT 1", (file_hash,))
     row = cur.fetchone()
     con.close()
     if row:
         try:
-            return dt.datetime.fromisoformat(row[0]).date()
+            date_val = dt.datetime.fromisoformat(row[0]).date()
+            title_val = row[1] or "Unknown Title"
+            return date_val, title_val
         except ValueError:
             return None
     return None
@@ -171,3 +173,73 @@ def _iso(x: dt.datetime) -> str:
     if x.tzinfo is None:
         x = x.replace(tzinfo=dt.timezone.utc)
     return x.astimezone(dt.timezone.utc).isoformat()
+
+
+def get_scheduled_videos(limit: int = 50, offset: int = 0) -> List[Tuple]:
+    """Get paginated list of scheduled videos."""
+    con = _conn()
+    cur = con.execute(
+        """
+        SELECT id, title, scheduled_at, seq_no, tg_file_id
+        FROM uploads
+        WHERE status='scheduled'
+        ORDER BY scheduled_at ASC, id ASC
+        LIMIT ? OFFSET ?
+    """, (limit, offset))
+    rows = cur.fetchall()
+    con.close()
+    return rows
+
+
+def count_scheduled_videos() -> int:
+    """Get total count of scheduled videos."""
+    con = _conn()
+    cur = con.execute("SELECT COUNT(*) FROM uploads WHERE status='scheduled'")
+    count = int(cur.fetchone()[0])
+    con.close()
+    return count
+
+
+def delete_scheduled_video(job_id: int) -> bool:
+    """Delete a specific scheduled job by ID."""
+    con = _conn()
+    con.execute("DELETE FROM uploads WHERE id=? AND status='scheduled'", (job_id,))
+    con.close()
+    return True
+
+
+def get_scheduled_after(scheduled_at: dt.datetime) -> List[Tuple]:
+    """Get all videos scheduled after a specific time."""
+    con = _conn()
+    cur = con.execute(
+        """
+        SELECT id, scheduled_at
+        FROM uploads
+        WHERE status='scheduled' AND scheduled_at > ?
+        ORDER BY scheduled_at ASC
+    """, (_iso(scheduled_at),))
+    rows = cur.fetchall()
+    con.close()
+    return rows
+
+
+def reschedule_forward(job_id: int, new_scheduled_at: dt.datetime):
+    """Move a video to an earlier time slot."""
+    con = _conn()
+    con.execute(
+        "UPDATE uploads SET scheduled_at=? WHERE id=?",
+        (_iso(new_scheduled_at), job_id)
+    )
+    con.close()
+
+
+def get_video_details(job_id: int) -> Optional[Tuple]:
+    """Get details of a specific scheduled video."""
+    con = _conn()
+    cur = con.execute(
+        "SELECT id, title, scheduled_at FROM uploads WHERE id=? AND status='scheduled'",
+        (job_id,)
+    )
+    row = cur.fetchone()
+    con.close()
+    return row

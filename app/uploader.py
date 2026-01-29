@@ -12,6 +12,12 @@ from typing import Any, Dict, List, Optional, Tuple
 import hashlib
 import subprocess
 
+class DuplicateVideoError(Exception):
+    def __init__(self, date: dt.date, title: str):
+        self.date = date
+        self.title = title
+        super().__init__(f"Duplicate video from {date} ({title})")
+
 from . import db
 from .youtube import list_channel_credentials, upload_to_all
 
@@ -185,7 +191,7 @@ def process_video(input_path: str) -> Optional[str]:
 
 
 
-async def handle_upload(bot, cfg: Dict[str, Any], tg_file_id: str, original_filename: str, base_title: str) -> str:
+async def handle_upload(bot, cfg: Dict[str, Any], tg_file_id: str, original_filename: str, base_title: str, force_upload: bool = False) -> str:
     # Determine today's upload count
     now = dt.datetime.now(tz=dt.timezone.utc)
     today = now.date()
@@ -205,15 +211,21 @@ async def handle_upload(bot, cfg: Dict[str, Any], tg_file_id: str, original_file
     
     thumbnail_path = None
     file_hash = None
+    processed_file = None
     
     try:
         await f.download_to_drive(custom_path=temp_name)
         
         # 1. Check for duplicates
-        file_hash = calculate_hash(temp_name)
-        first_date = db.check_if_hash_exists(file_hash)
-        if first_date:
-            return f"⚠️ Duplicate detected! This video was already processed/scheduled on {first_date}."
+        if not force_upload:
+            file_hash = calculate_hash(temp_name)
+            dup_info = db.check_if_hash_exists(file_hash)
+            if dup_info:
+                existing_date, existing_title = dup_info
+                raise DuplicateVideoError(existing_date, existing_title)
+        else:
+            # Need hash for logging anyway
+            file_hash = calculate_hash(temp_name)
 
         # 2. Extract thumbnail
         thumbnail_path = extract_thumbnail(temp_name)
@@ -227,6 +239,7 @@ async def handle_upload(bot, cfg: Dict[str, Any], tg_file_id: str, original_file
         final_file = processed_file
 
         # If under limit, upload immediately
+
         if uploaded_today < cfg["daily_limit"]:
             num_ok, results = upload_to_all(final_file, title, desc, tags, cfg["channels_path"], thumbnail_path=thumbnail_path)
             
@@ -269,8 +282,6 @@ async def handle_upload(bot, cfg: Dict[str, Any], tg_file_id: str, original_file
             )
             return f"✅ Daily limit reached. Video scheduled for {scheduled_time.isoformat()} UTC."
 
-    finally:
-        try:
     finally:
         try:
             if 'temp_name' in locals() and os.path.exists(temp_name):
