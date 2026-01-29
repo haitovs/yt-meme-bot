@@ -9,8 +9,6 @@ services:
       # Persist data
       - ./channels:/app/channels
       - ./data:/app/data
-      # Logs (optional, but good internal logs)
-      - ./logs:/app/logs
     environment:
       # You can override these here or in a .env file
       - TZ=UTC
