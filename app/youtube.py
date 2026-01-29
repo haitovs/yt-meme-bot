@@ -30,7 +30,7 @@ def _build_service(cred_file: str):
     return build("youtube", "v3", credentials=creds, cache_discovery=False)
 
 
-def upload_to_all(local_mp4_path: str, title: str, description: str, tags: List[str], channels_dir: str) -> Tuple[int, Dict[str, str]]:
+def upload_to_all(local_mp4_path: str, title: str, description: str, tags: List[str], channels_dir: str, thumbnail_path: str = None) -> Tuple[int, Dict[str, str]]:
     """Returns (num_success, results_per_channelfile)."""
     channel_files = list_channel_credentials(channels_dir)
     results: Dict[str, str] = {}
@@ -59,6 +59,17 @@ def upload_to_all(local_mp4_path: str, title: str, description: str, tags: List[
                 status, response = request.next_chunk()
                 # (optional) you could log `status.progress()` here
             video_id = response.get("id", "")
+
+            # Upload thumbnail if provided
+            if thumbnail_path and video_id:
+                try:
+                    service.thumbnails().set(
+                        videoId=video_id,
+                        media_body=MediaFileUpload(thumbnail_path)
+                    ).execute()
+                except Exception:
+                    pass
+
             results[chan_key] = f"ok:{video_id}"
             successes += 1
         except HttpError as e:

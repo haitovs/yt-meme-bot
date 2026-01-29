@@ -1,0 +1,23 @@
+services:
+  meme-bot:
+    build: .
+    container_name: yt-meme-bot
+    restart: unless-stopped
+    volumes:
+      # Mount config file if it exists, otherwise use environment variables
+      - ./config.yaml:/app/config.yaml:ro
+      # Persist data
+      - ./channels:/app/channels
+      - ./data:/app/data
+      # Logs (optional, but good internal logs)
+      - ./logs:/app/logs
+    environment:
+      # You can override these here or in a .env file
+      - TZ=UTC
+      # - TELEGRAM_TOKEN=your_token
+      # - ADMIN_ID=123456
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

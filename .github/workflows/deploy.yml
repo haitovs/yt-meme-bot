@@ -1,0 +1,40 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: "."
+          target: "/root/yt-meme-bot"
+          # Exclude files that should not be overwritten or are large/useless on server
+          # channels/ contains *.json which are ignored by git, so 'source: .' won't have them anyway.
+          # But if you commit them by accident, this protects the server versions.
+          exclude: ".git,venv,.venv,data,logs,channels"
+
+      - name: Restart Bot
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd /root/yt-meme-bot
+            
+            # Ensure script is executable
+            chmod +x deploy.sh
+            
+            # Run the deployment script
+            # We use 'docker compose up -d' inside deploy.sh, so it rebuilds and restarts
+            ./deploy.sh

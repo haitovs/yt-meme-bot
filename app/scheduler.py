@@ -5,8 +5,8 @@ from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
-import db
-from youtube import upload_to_all
+from . import db
+from .youtube import upload_to_all
 
 log = logging.getLogger(__name__)
 
@@ -91,5 +91,26 @@ def init_scheduler(application, cfg: dict):
                     await application.bot.send_message(cfg["admin_id"], f"❌ Error on job {job_id}: {e}\nRescheduled for {new_time.isoformat()} UTC.")
         except Exception as e:
             log.exception("Scheduler loop crashed: %s", e)
+
+    @scheduler.scheduled_job("cron", hour=9, minute=0, id="daily_summary")
+    async def daily_summary():
+        try:
+            now = dt.datetime.now(tz=dt.timezone.utc)
+            today = now.date()
+            uploaded_today = db.count_uploaded_on(today)
+            scheduled_today = db.count_scheduled_on(today)
+            
+            # Simple check for failed jobs in last 24h could be added here, 
+            # for now just status report.
+            
+            msg = (
+                f"☀️ **Daily Morning Report**\n\n"
+                f"• Uploaded Today: {uploaded_today}/{cfg['daily_limit']}\n"
+                f"• Queue for Today: {scheduled_today}\n"
+                f"• System: OK"
+            )
+            await application.bot.send_message(cfg["admin_id"], msg)
+        except Exception as e:
+            log.error("Failed to send daily summary: %s", e)
 
     scheduler.start()

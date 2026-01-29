@@ -2,66 +2,76 @@
 
 Telegram bot that accepts short MP4 memes from a trusted admin account, enriches the metadata, and uploads them to every configured YouTube channel. When the daily upload quota is reached, videos are automatically queued and posted in evenly spaced slots the next day.
 
-## Prerequisites
+## Features
 
-- Python 3.10+
-- Telegram bot token and your Telegram user id (admin)  
-- Google Cloud project with the YouTube Data API enabled
+- **Robust Architecture**: Docker-ready "1 file run" (runs as non-root user).
+- **Quota Management**: Automatically schedules uploads for the next day if daily limit is reached.
+- **Auto-Retry**: Resilient against ephemeral API errors.
+- **Smart Metadata**: Randomly selects descriptions and relevant tags for memes.
+- **Duplicate Detection**: Prevents accidental re-uploads using SHA256 hashing.
+- **Auto-Thumbnails**: Extracts the "best" frame from the middle of the video using FFmpeg.
+- **Daily Reports**: Morning summary of upload stats.
 
-## 1. Install dependencies
+## Prerequisities
 
-```bash
-git clone https://github.com/haitovs/yt-meme-bot.git
-cd yt-meme-bot
-python -m venv .venv
-.venv\Scripts\activate  # or source .venv/bin/activate on Linux/macOS
-pip install -r requirements.txt
-```
+- Docker & Docker Compose (Recommended)
+- OR Python 3.10+ & FFmpeg
+- Telegram Bot Token & Admin ID
+- Google YouTube Data API Credentials
 
-## 2. Configure the bot
+## 🚀 Quick Start (Docker)
 
-Edit `config.yaml` and set:
+1. **Configure**:
+    cp config.yaml.example config.yaml
 
-- `telegram_token` – token from @BotFather
-- `admin_id` – your Telegram numeric user id (messages from others are rejected)
-- `daily_limit` – how many uploads per UTC day can go live immediately
-- `upload_start_hour` / `upload_interval_minutes` – define the queue window for the next day
-- `channels_path` (optional) – folder that stores authorized YouTube credentials (defaults to `channels/`)
-- `db_path` (optional) – SQLite database path (defaults to `uploads.db`)
+    # Edit config.yaml with your tokens
 
-The loader validates the values and creates the folders automatically.
+2. **Add Credentials**:
 
-## 3. Add YouTube credentials
+    # Place your YouTube "client_secret" or oauth token JSONs in channels/
 
-1. Create an OAuth consent screen + Desktop app credentials in Google Cloud.  
-2. Run the OAuth flow (e.g. via the [YouTube Data API Python quickstart](https://developers.google.com/youtube/v3/quickstart/python)) for each channel you want to target.  
-3. Save the resulting **authorized user** JSON (`token`, `refresh_token`, `client_id`, …) inside the `channels/` folder. Use one file per channel.  
-4. See `channels/README.md` for an example format. The folder is ignored by git so you don’t leak secrets.
+    # (See channels/README.md)
 
-## 4. (Optional) Customize templates
+3. **Run**:
 
-Update the JSON arrays inside `templates/description.json` and `templates/tags.json` to control the random description snippets and the tag pool. When missing or invalid, the bot falls back to safe built‑in defaults.
+    ```bash
+    ./deploy.sh
+    ```
 
-## Running
+That's it! The bot will start, create necessary database files in `data/`, and log to `logs/`.
 
-```bash
-python bot.py
-```
+### Configuration via Environment Variables
 
-Available commands (admin only):
+You can override config values using environment variables (great for Portainer/Coolify):
 
-- `/upload` – guided flow to send an MP4 (≤ 50 MB) and the base title
-- `/status` – shows how many videos were uploaded today and how many are queued
+- `TELEGRAM_TOKEN`
+- `ADMIN_ID`
+- `DAILY_LIMIT`
+- `UPLOAD_START_HOUR`
+- `UPLOAD_INTERVAL_MINUTES`
 
-Uploads start immediately while you are under `daily_limit`. Once the cap is hit, the bot schedules new jobs for the next UTC day, spacing them by `upload_interval_minutes` starting at `upload_start_hour`. The async scheduler checks the queue every minute and retries/reschedules failed jobs automatically.
+## Development (Local Python)
 
-Runtime artifacts:
+1. **Install**:
 
-- `uploads.db` – SQLite log of all jobs (auto-created if missing, ignored by git)
-- `bot.log` – combined console/file log for debugging
+    ```bash
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -r requirements.txt
+    # Ensure ffmpeg is installed on your system
+    ```
 
-## Troubleshooting
+2. **Run**:
 
-- `ConfigError`: ensure `config.yaml` exists and all required keys are set.  
-- `❌ No YouTube channel credentials...`: drop at least one authorized user JSON into `channels/`.  
-- API quota/HTTP errors: the scheduler automatically reschedules for the next day and includes the reason in the admin notification. Check `bot.log` for stack traces.
+    ```bash
+    # Run as a module
+    python -m app.bot
+    ```
+
+## Project Structure
+
+- `app/`: Source code.
+- `channels/`: Mount point for YouTube credentials.
+- `data/`: Mount point for SQLite database.
+- `logs/`: Application logs.
+- `deploy.sh`: One-click deployment script.

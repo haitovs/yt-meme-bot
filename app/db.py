@@ -34,7 +34,7 @@ def init_db(path: str):
     )
     """)
     # Lightweight migrations (in case table existed)
-    for col in ["tg_file_id", "channels", "uploaded_at", "error", "seq_no"]:
+    for col in ["tg_file_id", "channels", "uploaded_at", "error", "seq_no", "file_hash"]:
         try:
             cur.execute(f"ALTER TABLE uploads ADD COLUMN {col} TEXT")
         except sqlite3.OperationalError:
@@ -54,6 +54,7 @@ def log_new_job(
     scheduled_at: dt.datetime,
     status: str,
     seq_no: int,
+    file_hash: str | None = None,
     uploaded_at: Optional[dt.datetime] = None,
     error: Optional[str] = None,
 ):
@@ -61,8 +62,8 @@ def log_new_job(
     con.execute(
         """
         INSERT INTO uploads (tg_file_id, file, title, description, tags, channels,
-                             scheduled_at, uploaded_at, status, error, seq_no)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                             scheduled_at, uploaded_at, status, error, seq_no, file_hash)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """,
         (
             tg_file_id,
@@ -76,9 +77,26 @@ def log_new_job(
             status,
             (error or "")[:500] if error else None,
             seq_no,
+            file_hash
         ),
     )
     con.close()
+
+
+def check_if_hash_exists(file_hash: str) -> Optional[dt.date]:
+    """Returns date of first upload if hash exists, else None."""
+    if not file_hash:
+        return None
+    con = _conn()
+    cur = con.execute("SELECT scheduled_at FROM uploads WHERE file_hash = ? LIMIT 1", (file_hash,))
+    row = cur.fetchone()
+    con.close()
+    if row:
+        try:
+            return dt.datetime.fromisoformat(row[0]).date()
+        except ValueError:
+            return None
+    return None
 
 
 def mark_uploaded(job_id: int, when: dt.datetime):
