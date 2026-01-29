@@ -17,7 +17,8 @@ RUN mkdir -p channels data logs
 
 # Security: Create non-root user
 RUN useradd -m appuser && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app/logs
 USER appuser
 
 # Set env vars to point to these
